@@ -10,65 +10,115 @@ import Darwin
 import BSDSockets
 
 struct ContentView: View {
+    
     @State private var statusMessage: String = ""
 
+    private let tcpClient = BSDTCPClient(host: "127.0.0.1", port: 8080)
+    private let udpClient = BSDUDPClient(host: "127.0.0.1", port: 8080)
+
     var body: some View {
-        VStack {
-            if !statusMessage.isEmpty {
-                Text(statusMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-            }
-            Spacer()
-            HStack(spacing: 12) {
-                Button("TCP 서버 확인") {
-                    checkServerResponse()
+        NavigationStack {
+            VStack(spacing: 32) {
+                HStack(alignment: .top) {
+                    Spacer()
+                    tcpColumn
+                    Spacer()
+                    udpColumn
+                    Spacer()
                 }
-                .buttonStyle(.borderedProminent)
-                Button("UDP 서버 확인") {
-                    checkUDPServerResponse()
+                
+                VStack(spacing: 16) {
+                    Text("Result")
+                        .font(.headline)
+                    if !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
+                
+                Spacer()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Spacer()
+            .navigationTitle("BSD Sockets")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .padding()
     }
 }
 
-// MARK: - private
+// MARK: - Subviews
 private extension ContentView {
-    func checkServerResponse() {
-        checkResponse(client: BSDTCPClient(host: "127.0.0.1", port: 8080), label: "TCP", greeting: "Hello, TCP Server!")
-    }
-
-    func checkUDPServerResponse() {
-        checkResponse(client: BSDUDPClient(host: "127.0.0.1", port: 8080), label: "UDP", greeting: "Hello, UDP Server!")
-    }
-
-    func checkResponse(client: BSDClientMakable, label: String, greeting: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            var message: String = ""
-            if client.connect() {
-                _ = client.send(string: greeting)
-                if let response = client.receive(maxLength: 4096) {
-                    message = label.isEmpty ? "서버 응답: \(response)" : "\(label) 서버 응답: \(response)"
-                } else {
-                    message = label.isEmpty ? "응답 수신 실패" : "\(label) 응답 수신 실패"
+    var tcpColumn: some View {
+        VStack(spacing: 12) {
+            Text("TCP")
+                .font(.headline)
+            
+            Button("Connect") {
+                connectTCP()
+            }
+            .buttonStyle(.borderedProminent)
+            
+            Button("Send") {
+                sendMessage(client: tcpClient, label: "TCP") { message in
+                    statusMessage = message
                 }
-                print(message)
-                client.close()
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    var udpColumn: some View {
+        VStack(spacing: 12) {
+            Text("UDP")
+                .font(.headline)
+
+            Button("Send") {
+                sendMessage(client: udpClient, label: "UDP") { message in
+                    statusMessage = message
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+}
+
+// MARK: - Private
+private extension ContentView {
+    func connectTCP() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let success = tcpClient.connect()
+            let message: String
+            if success {
+                message = "TCP 연결 성공"
             } else {
-                let errMsg = client.lastConnectError != 0
-                    ? String(cString: strerror(client.lastConnectError))
+                let errMsg = tcpClient.lastConnectError != 0
+                    ? String(cString: strerror(tcpClient.lastConnectError))
                     : "알 수 없음"
-                message = label.isEmpty ? "연결 실패: \(errMsg)" : "\(label) 연결 실패: \(errMsg)"
-                print("연결에 실패했습니다. (\(errMsg))")
+                message = "TCP 연결 실패: \(errMsg)"
             }
             DispatchQueue.main.async {
                 statusMessage = message
+            }
+        }
+    }
+
+    func sendMessage(
+        client: BSDClientMakable,
+        label: String,
+        completion: @escaping (String) -> Void
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let sent = client.send(string: "Hello, \(label) Server!")
+            let message: String
+            if sent > 0 {
+                if let response = client.receive(maxLength: 4096) {
+                    message = "\(label) 서버 응답: \(response)"
+                } else {
+                    message = "\(label) 전송 완료 (응답 없음)"
+                }
+            } else {
+                message = "\(label) 전송 실패"
+            }
+            DispatchQueue.main.async {
+                completion(message)
             }
         }
     }

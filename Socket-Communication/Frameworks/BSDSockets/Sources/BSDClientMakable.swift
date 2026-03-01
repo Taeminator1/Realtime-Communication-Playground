@@ -8,10 +8,7 @@
 import Foundation
 
 public protocol BSDClientMakable: AnyObject {
-    
-    var lastConnectError: Int32 { get }
 
-    func connect() -> Bool
     func close()
     
     func send(string: String) -> Int

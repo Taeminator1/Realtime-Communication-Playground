@@ -11,7 +11,7 @@ import Darwin
 // MARK: - BSD TCP Client
 // 주의: socketFD는 스레드 세이프하지 않습니다. 동시 접근 시 외부에서 직렬화하세요.
 
-final public class BSDTCPClient: BSDClientMakable {
+final public class BSDTCPClient {
     private var socketFD: Int32 = -1
     private let host: String
     private let port: UInt16
@@ -65,7 +65,10 @@ final public class BSDTCPClient: BSDClientMakable {
         }
         return false
     }
-    
+}
+
+// MARK: - BSDClientMakable
+extension BSDTCPClient: BSDClientMakable {
     public func close() {
         if socketFD >= 0 {
             Darwin.close(socketFD)
@@ -99,4 +102,3 @@ final public class BSDTCPClient: BSDClientMakable {
         return String(data: data, encoding: .utf8)
     }
 }
-
