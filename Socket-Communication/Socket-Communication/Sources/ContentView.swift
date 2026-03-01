@@ -10,72 +10,50 @@ import Darwin
 import BSDSockets
 
 struct ContentView: View {
-    
+
     @State private var statusMessage: String = ""
+    @State private var isTCPConnected: Bool = false
 
     private let tcpClient = BSDTCPClient(host: "127.0.0.1", port: 8080)
     private let udpClient = BSDUDPClient(host: "127.0.0.1", port: 8080)
-
+    
     var body: some View {
         NavigationStack {
-            VStack(spacing: 32) {
-                HStack(alignment: .top) {
-                    Spacer()
-                    tcpColumn
-                    Spacer()
-                    udpColumn
-                    Spacer()
-                }
-                
-                VStack(spacing: 16) {
-                    Text("Result")
-                        .font(.headline)
-                    if !statusMessage.isEmpty {
-                        Text(statusMessage)
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Button("TCP Client 연결") {
+                        connectTCP()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isTCPConnected)
+
+                    Button("TCP Client 해제") {
+                        disconnectTCP()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!isTCPConnected)
+
+                    Button("데이터 전송") {
+                        let client: BSDClientMakable = isTCPConnected ? tcpClient : udpClient
+                        let label = isTCPConnected ? "TCP" : "UDP"
+                        sendMessage(client: client, label: label)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(isTCPConnected ? .blue : .orange)
                 }
-                
+
+                if !statusMessage.isEmpty {
+                    Text(statusMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
                 Spacer()
             }
             .navigationTitle("BSD Sockets")
             .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-
-// MARK: - Subviews
-private extension ContentView {
-    var tcpColumn: some View {
-        VStack(spacing: 12) {
-            Text("TCP")
-                .font(.headline)
-            
-            Button("Connect") {
-                connectTCP()
-            }
-            .buttonStyle(.borderedProminent)
-            
-            Button("Send") {
-                sendMessage(client: tcpClient, label: "TCP") { message in
-                    statusMessage = message
-                }
-            }
-            .buttonStyle(.bordered)
-        }
-    }
-
-    var udpColumn: some View {
-        VStack(spacing: 12) {
-            Text("UDP")
-                .font(.headline)
-
-            Button("Send") {
-                sendMessage(client: udpClient, label: "UDP") { message in
-                    statusMessage = message
-                }
-            }
-            .buttonStyle(.borderedProminent)
         }
     }
 }
@@ -95,16 +73,19 @@ private extension ContentView {
                 message = "TCP 연결 실패: \(errMsg)"
             }
             DispatchQueue.main.async {
+                isTCPConnected = success
                 statusMessage = message
             }
         }
     }
 
-    func sendMessage(
-        client: BSDClientMakable,
-        label: String,
-        completion: @escaping (String) -> Void
-    ) {
+    func disconnectTCP() {
+        tcpClient.close()
+        isTCPConnected = false
+        statusMessage = "TCP 연결 해제"
+    }
+
+    func sendMessage(client: BSDClientMakable, label: String) {
         DispatchQueue.global(qos: .userInitiated).async {
             let sent = client.send(string: "Hello, \(label) Server!")
             let message: String
@@ -118,7 +99,7 @@ private extension ContentView {
                 message = "\(label) 전송 실패"
             }
             DispatchQueue.main.async {
-                completion(message)
+                statusMessage = message
             }
         }
     }

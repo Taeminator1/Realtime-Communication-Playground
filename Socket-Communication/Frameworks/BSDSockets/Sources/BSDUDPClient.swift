@@ -50,20 +50,31 @@ extension BSDUDPClient: BSDClientMakable {
         guard status == 0, let resolved = result else { return -1 }
         defer { freeaddrinfo(resolved) }
 
+        close()
+
         var info: UnsafeMutablePointer<addrinfo>? = resolved
         while let current = info {
-            let tempFD = Darwin.socket(current.pointee.ai_family, current.pointee.ai_socktype, current.pointee.ai_protocol)
-            guard tempFD >= 0 else {
+            let fd = Darwin.socket(current.pointee.ai_family, current.pointee.ai_socktype, current.pointee.ai_protocol)
+            guard fd >= 0 else {
                 info = current.pointee.ai_next
                 continue
             }
-            defer { Darwin.close(tempFD) }
+
+            var timeout = timeval(tv_sec: 3, tv_usec: 0)
+            setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
             let sent = data.withUnsafeBytes { buffer -> Int in
                 guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-                return Darwin.sendto(tempFD, base, data.count, 0, current.pointee.ai_addr, current.pointee.ai_addrlen)
+                return Darwin.sendto(fd, base, data.count, 0, current.pointee.ai_addr, current.pointee.ai_addrlen)
             }
-            return sent >= 0 ? sent : -1
+
+            if sent >= 0 {
+                socketFD = fd
+                return sent
+            }
+
+            Darwin.close(fd)
+            info = current.pointee.ai_next
         }
         return -1
     }
@@ -71,8 +82,8 @@ extension BSDUDPClient: BSDClientMakable {
     public func receive(maxLength: Int) -> String? {
         guard socketFD >= 0 else { return nil }
         var buffer = [UInt8](repeating: 0, count: maxLength)
-        let bytesRead = Darwin.recv(socketFD, &buffer, maxLength, 0)
-        if bytesRead < 0 { return nil }
+        let bytesRead = Darwin.recvfrom(socketFD, &buffer, maxLength, 0, nil, nil)
+        guard bytesRead > 0 else { return nil }
         let data = Data(bytes: buffer, count: bytesRead)
         return String(data: data, encoding: .utf8)
     }
