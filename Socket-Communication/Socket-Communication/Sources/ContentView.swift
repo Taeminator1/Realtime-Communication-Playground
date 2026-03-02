@@ -17,8 +17,13 @@ struct ContentView: View {
     @State private var isUDPReceiving: Bool = false
     @State private var receivedMessages: [String] = []
 
-    private let tcpClient = BSDTCPClient(host: "127.0.0.1", port: 8080)
-    private let udpClient = BSDUDPClient(host: "127.0.0.1", port: 8080)
+    private let tcpClient: TCPClientMakable
+    private let udpClient: UDPClientMakable
+
+    init(tcpClient: TCPClientMakable, udpClient: UDPClientMakable) {
+        self.tcpClient = tcpClient
+        self.udpClient = udpClient
+    }
 
     var body: some View {
         NavigationStack {
@@ -81,6 +86,27 @@ struct ContentView: View {
 
 // MARK: - Private
 private extension ContentView {
+    
+    func sendMessage(client: SocketClientMakable, label: String) {
+        DispatchQueue.global(qos: .userInitiated).async(execute: {
+            let sent = client.send(string: "Hello, \(label) Server!")
+            let message: String
+            if sent > 0 {
+                if let response = client.receive(maxLength: 4096) {
+                    message = "\(label) 서버 응답: \(response)"
+                } else {
+                    message = "\(label) 전송 완료 (응답 없음)"
+                }
+            } else {
+                message = "\(label) 전송 실패"
+            }
+            DispatchQueue.main.async {
+                statusMessage = message
+            }
+        })
+    }
+    
+    // MARK: - TCP
     func connectTCP() {
         DispatchQueue.global(qos: .userInitiated).async {
             let success = tcpClient.connect()
@@ -106,25 +132,7 @@ private extension ContentView {
         statusMessage = "TCP 연결 해제"
     }
 
-    func sendMessage(client: SocketClientMakable, label: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let sent = client.send(string: "Hello, \(label) Server!")
-            let message: String
-            if sent > 0 {
-                if let response = client.receive(maxLength: 4096) {
-                    message = "\(label) 서버 응답: \(response)"
-                } else {
-                    message = "\(label) 전송 완료 (응답 없음)"
-                }
-            } else {
-                message = "\(label) 전송 실패"
-            }
-            DispatchQueue.main.async {
-                statusMessage = message
-            }
-        }
-    }
-
+    // MARK: - UDP
     func startUDPReceiving() {
         DispatchQueue.global(qos: .userInitiated).async {
             let sent = udpClient.send(string: "subscribe")
@@ -139,7 +147,7 @@ private extension ContentView {
                 isUDPReceiving = true
                 statusMessage = "UDP 수신 대기 중..."
             }
-            udpClient.startReceiving { message in
+            udpClient.startReceiving(maxLength: 4096) { message in
                 DispatchQueue.main.async {
                     receivedMessages.append(message)
                 }
@@ -156,5 +164,8 @@ private extension ContentView {
 }
 
 #Preview {
-    ContentView()
+    ContentView(
+        tcpClient: BSDTCPClient(host: "127.0.0.1", port: 8080),
+        udpClient: BSDUDPClient(host: "127.0.0.1", port: 8080)
+    )
 }

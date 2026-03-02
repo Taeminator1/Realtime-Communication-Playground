@@ -94,7 +94,7 @@ extension BSDUDPClient: UDPClientMakable {
 
     /// 백그라운드에서 recvfrom을 반복 호출하여 서버가 보내는 데이터를 지속 수신한다.
     /// send(string:)로 소켓이 생성된 뒤 호출해야 한다.
-    public func startReceiving(maxLength: Int = 4096, onReceive: @escaping (String) -> Void) {
+    public func startReceiving(maxLength: Int, onReceive: @escaping (String) -> Void) {
         guard socketFD >= 0, !isReceiving else { return }
         isReceiving = true
 
