@@ -9,11 +9,13 @@ import Foundation
 import Darwin
 
 // MARK: - BSD UDP Client
-// UDP는 비연결형이지만 connect()로 기본 상대를 지정하면 send/recv 사용 가능.
+// UDP는 비연결형(connectionless) 프로토콜.
+// 소켓 FD를 유지하는 것은 OS 엔드포인트 관리이며, 커널 레벨 연결 상태와는 무관하다.
 // 주의: socketFD는 스레드 세이프하지 않습니다. 동시 접근 시 외부에서 직렬화하세요.
 
 final public class BSDUDPClient {
     private var socketFD: Int32 = -1
+    private var isReceiving: Bool = false
     private let host: String
     private let port: UInt16
 
@@ -23,6 +25,7 @@ final public class BSDUDPClient {
     }
 
     deinit {
+        stopReceiving()
         close()
     }
 }
@@ -86,5 +89,34 @@ extension BSDUDPClient: BSDClientMakable {
         guard bytesRead > 0 else { return nil }
         let data = Data(bytes: buffer, count: bytesRead)
         return String(data: data, encoding: .utf8)
+    }
+}
+
+// MARK: - 수신 루프
+extension BSDUDPClient {
+
+    /// 백그라운드에서 recvfrom을 반복 호출하여 서버가 보내는 데이터를 지속 수신한다.
+    /// send(string:)로 소켓이 생성된 뒤 호출해야 한다.
+    public func startReceiving(maxLength: Int = 4096, onReceive: @escaping (String) -> Void) {
+        guard socketFD >= 0, !isReceiving else { return }
+        isReceiving = true
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var buffer = [UInt8](repeating: 0, count: maxLength)
+
+            while let self, self.isReceiving, self.socketFD >= 0 {
+                let bytesRead = Darwin.recvfrom(self.socketFD, &buffer, maxLength, 0, nil, nil)
+                if bytesRead > 0 {
+                    let data = Data(bytes: buffer, count: bytesRead)
+                    if let message = String(data: data, encoding: .utf8) {
+                        onReceive(message)
+                    }
+                }
+            }
+        }
+    }
+
+    public func stopReceiving() {
+        isReceiving = false
     }
 }

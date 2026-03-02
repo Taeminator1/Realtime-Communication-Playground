@@ -13,10 +13,12 @@ struct ContentView: View {
 
     @State private var statusMessage: String = ""
     @State private var isTCPConnected: Bool = false
+    @State private var isUDPReceiving: Bool = false
+    @State private var receivedMessages: [String] = []
 
     private let tcpClient = BSDTCPClient(host: "127.0.0.1", port: 8080)
     private let udpClient = BSDUDPClient(host: "127.0.0.1", port: 8080)
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
@@ -40,6 +42,16 @@ struct ContentView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(isTCPConnected ? .blue : .orange)
+
+                    Button(isUDPReceiving ? "UDP 수신 중지" : "UDP 수신 시작") {
+                        if isUDPReceiving {
+                            stopUDPReceiving()
+                        } else {
+                            startUDPReceiving()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(isUDPReceiving ? .red : .green)
                 }
 
                 if !statusMessage.isEmpty {
@@ -48,6 +60,14 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                }
+
+                if !receivedMessages.isEmpty {
+                    List(receivedMessages.indices, id: \.self) { index in
+                        Text(receivedMessages[index])
+                            .font(.caption)
+                    }
+                    .listStyle(.plain)
                 }
 
                 Spacer()
@@ -102,6 +122,35 @@ private extension ContentView {
                 statusMessage = message
             }
         }
+    }
+
+    func startUDPReceiving() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let sent = udpClient.send(string: "subscribe")
+            guard sent > 0 else {
+                DispatchQueue.main.async {
+                    statusMessage = "UDP 서버 등록 실패"
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                receivedMessages = []
+                isUDPReceiving = true
+                statusMessage = "UDP 수신 대기 중..."
+            }
+            udpClient.startReceiving { message in
+                DispatchQueue.main.async {
+                    receivedMessages.append(message)
+                }
+            }
+        }
+    }
+
+    func stopUDPReceiving() {
+        udpClient.stopReceiving()
+        udpClient.close()
+        isUDPReceiving = false
+        statusMessage = "UDP 수신 중지"
     }
 }
 

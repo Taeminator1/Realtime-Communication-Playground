@@ -6,6 +6,11 @@ TCP Echo Server
 - 기본 포트: 8080
 """
 
+"""
+Commands
+- 에코: python3 tcp_echo_server.py
+"""
+
 import socket
 import threading
 import signal
