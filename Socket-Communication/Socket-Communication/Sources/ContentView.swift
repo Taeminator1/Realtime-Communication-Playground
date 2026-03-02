@@ -7,7 +7,8 @@
 
 import SwiftUI
 import Darwin
-import BSDSockets
+import BSDSocket
+import SocketClient
 
 struct ContentView: View {
 
@@ -36,7 +37,7 @@ struct ContentView: View {
                     .disabled(!isTCPConnected)
 
                     Button("데이터 전송") {
-                        let client: BSDClientMakable = isTCPConnected ? tcpClient : udpClient
+                        let client: SocketClientMakable = isTCPConnected ? tcpClient : udpClient
                         let label = isTCPConnected ? "TCP" : "UDP"
                         sendMessage(client: client, label: label)
                     }
@@ -105,7 +106,7 @@ private extension ContentView {
         statusMessage = "TCP 연결 해제"
     }
 
-    func sendMessage(client: BSDClientMakable, label: String) {
+    func sendMessage(client: SocketClientMakable, label: String) {
         DispatchQueue.global(qos: .userInitiated).async {
             let sent = client.send(string: "Hello, \(label) Server!")
             let message: String

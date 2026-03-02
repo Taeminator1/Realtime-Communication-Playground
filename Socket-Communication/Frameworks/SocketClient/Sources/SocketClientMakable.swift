@@ -1,13 +1,13 @@
 //
-//  BSDClientMakable.swift
-//  BSDSockets
+//  SocketClientMakable.swift
+//  SocketClient
 //
 //  Created by Taemin Yun on 2026-03-01.
 //
 
 import Foundation
 
-public protocol BSDClientMakable: AnyObject {
+public protocol SocketClientMakable: AnyObject {
 
     func close()
     

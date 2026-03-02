@@ -12,6 +12,7 @@ let project = Project.app(
         ]
     ),
     dependencies: [
-        .project(target: "BSDSockets", path: .relativeToRoot("Frameworks/BSDSockets"), status: .required),
+        .project(target: "BSDSocket", path: .relativeToRoot("Frameworks/BSDSocket"), status: .required),
+        .project(target: "SocketClient", path: .relativeToRoot("Frameworks/SocketClient"), status: .required),
     ]
 )

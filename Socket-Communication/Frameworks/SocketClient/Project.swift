@@ -2,5 +2,5 @@ import ProjectDescription
 import ProjectDescriptionHelpers
 
 let project = Project.framework(
-    name: "BSDSockets"
+    name: "SocketClient"
 )

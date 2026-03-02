@@ -1,12 +1,13 @@
 //
 //  BSDUDPClient.swift
-//  BSDSockets
+//  BSDSocket
 //
 //  Created by Taemin Yun on 2026-03-01.
 //
 
 import Foundation
 import Darwin
+import SocketClient
 
 // MARK: - BSD UDP Client
 // UDP는 비연결형(connectionless) 프로토콜.
@@ -30,8 +31,8 @@ final public class BSDUDPClient {
     }
 }
 
-// MARK: - BSDClientMakable
-extension BSDUDPClient: BSDClientMakable {
+// MARK: - UDPClientMakable
+extension BSDUDPClient: UDPClientMakable {
     
     public func close() {
         if socketFD >= 0 {
@@ -90,10 +91,6 @@ extension BSDUDPClient: BSDClientMakable {
         let data = Data(bytes: buffer, count: bytesRead)
         return String(data: data, encoding: .utf8)
     }
-}
-
-// MARK: - 수신 루프
-extension BSDUDPClient {
 
     /// 백그라운드에서 recvfrom을 반복 호출하여 서버가 보내는 데이터를 지속 수신한다.
     /// send(string:)로 소켓이 생성된 뒤 호출해야 한다.

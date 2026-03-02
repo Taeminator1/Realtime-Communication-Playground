@@ -7,6 +7,7 @@
 
 import Foundation
 import Darwin
+import SocketClient
 
 // MARK: - BSD TCP Client
 // 주의: socketFD는 스레드 세이프하지 않습니다. 동시 접근 시 외부에서 직렬화하세요.
@@ -26,7 +27,44 @@ final public class BSDTCPClient {
     }
 
     public private(set) var lastConnectError: Int32 = 0
+}
 
+// MARK: - TCPClientMakable
+extension BSDTCPClient: TCPClientMakable {
+
+    public func close() {
+        if socketFD >= 0 {
+            Darwin.close(socketFD)
+            socketFD = -1
+        }
+    }
+
+    public func send(string: String) -> Int {
+        guard socketFD >= 0,
+              let data = string.data(using: .utf8),
+              !data.isEmpty else { return -1 }
+        return data.withUnsafeBytes { buffer in
+            guard let baseAddress = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
+            var totalSent = 0
+            while totalSent < data.count {
+                let sent = Darwin.send(socketFD, baseAddress + totalSent, data.count - totalSent, 0)
+                if sent <= 0 { return -1 }
+                totalSent += sent
+            }
+            return totalSent
+        }
+    }
+
+    public func receive(maxLength: Int) -> String? {
+        guard socketFD >= 0 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: maxLength)
+        let bytesRead = Darwin.recv(socketFD, &buffer, maxLength, 0)
+        if bytesRead == 0 { return nil }
+        if bytesRead < 0 { return nil }
+        let data = Data(bytes: buffer, count: bytesRead)
+        return String(data: data, encoding: .utf8)
+    }
+    
     public func connect() -> Bool {
         lastConnectError = 0
         var hints = addrinfo()
@@ -64,41 +102,5 @@ final public class BSDTCPClient {
             info = current.pointee.ai_next
         }
         return false
-    }
-}
-
-// MARK: - BSDClientMakable
-extension BSDTCPClient: BSDClientMakable {
-    public func close() {
-        if socketFD >= 0 {
-            Darwin.close(socketFD)
-            socketFD = -1
-        }
-    }
-
-    public func send(string: String) -> Int {
-        guard socketFD >= 0,
-              let data = string.data(using: .utf8),
-              !data.isEmpty else { return -1 }
-        return data.withUnsafeBytes { buffer in
-            guard let baseAddress = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-            var totalSent = 0
-            while totalSent < data.count {
-                let sent = Darwin.send(socketFD, baseAddress + totalSent, data.count - totalSent, 0)
-                if sent <= 0 { return -1 }
-                totalSent += sent
-            }
-            return totalSent
-        }
-    }
-
-    public func receive(maxLength: Int) -> String? {
-        guard socketFD >= 0 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: maxLength)
-        let bytesRead = Darwin.recv(socketFD, &buffer, maxLength, 0)
-        if bytesRead == 0 { return nil }
-        if bytesRead < 0 { return nil }
-        let data = Data(bytes: buffer, count: bytesRead)
-        return String(data: data, encoding: .utf8)
     }
 }
