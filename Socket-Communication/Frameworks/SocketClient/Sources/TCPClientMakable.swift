@@ -9,6 +9,5 @@ import Foundation
 
 public protocol TCPClientMakable: SocketClientMakable {
 
-    var lastConnectError: Int32 { get }
-    func connect() -> Bool
+    func connect() -> Result<Void, TCPConnectionError>
 }

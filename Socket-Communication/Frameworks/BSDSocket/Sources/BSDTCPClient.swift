@@ -25,8 +25,6 @@ final public class BSDTCPClient {
     deinit {
         close()
     }
-
-    public private(set) var lastConnectError: Int32 = 0
 }
 
 // MARK: - TCPClientMakable
@@ -65,8 +63,7 @@ extension BSDTCPClient: TCPClientMakable {
         return String(data: data, encoding: .utf8)
     }
     
-    public func connect() -> Bool {
-        lastConnectError = 0
+    public func connect() -> Result<Void, TCPConnectionError> {
         var hints = addrinfo()
         hints.ai_family = AF_UNSPEC
         hints.ai_socktype = SOCK_STREAM
@@ -77,30 +74,27 @@ extension BSDTCPClient: TCPClientMakable {
         let status = getaddrinfo(host, portStr, &hints, &result)
         guard status == 0, let result = result else {
             let errMsg = (status != 0) ? String(cString: gai_strerror(status)) : "nil result"
-            print("호스트 조회 실패: \(host), \(errMsg)")
-            return false
+            return .failure(.hostResolutionFailed("\(host), \(errMsg)"))
         }
         defer { freeaddrinfo(result) }
 
+        var lastError: TCPConnectionError = .connectionFailed(0)
         var info: UnsafeMutablePointer<addrinfo>? = result
         while let current = info {
             socketFD = Darwin.socket(current.pointee.ai_family, current.pointee.ai_socktype, current.pointee.ai_protocol)
             if socketFD >= 0 {
                 let connectResult = Darwin.connect(socketFD, current.pointee.ai_addr, current.pointee.ai_addrlen)
                 if connectResult == 0 {
-                    return true
+                    return .success(())
                 }
-                lastConnectError = errno
-                let errMsg = String(cString: strerror(errno))
-                print("연결 실패: \(errMsg) (errno=\(errno))")
+                lastError = .connectionFailed(errno)
                 Darwin.close(socketFD)
                 socketFD = -1
             } else {
-                lastConnectError = errno
-                print("소켓 생성 실패: \(String(cString: strerror(errno)))")
+                lastError = .socketCreationFailed(errno)
             }
             info = current.pointee.ai_next
         }
-        return false
+        return .failure(lastError)
     }
 }

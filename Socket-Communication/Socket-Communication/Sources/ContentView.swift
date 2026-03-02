@@ -109,19 +109,16 @@ private extension ContentView {
     // MARK: - TCP
     func connectTCP() {
         DispatchQueue.global(qos: .userInitiated).async {
-            let success = tcpClient.connect()
-            let message: String
-            if success {
-                message = "TCP 연결 성공"
-            } else {
-                let errMsg = tcpClient.lastConnectError != 0
-                    ? String(cString: strerror(tcpClient.lastConnectError))
-                    : "알 수 없음"
-                message = "TCP 연결 실패: \(errMsg)"
-            }
+            let result = tcpClient.connect()
             DispatchQueue.main.async {
-                isTCPConnected = success
-                statusMessage = message
+                switch result {
+                    case .success:
+                        isTCPConnected = true
+                        statusMessage = "TCP 연결 성공"
+                    case .failure(let error):
+                        isTCPConnected = false
+                        statusMessage = "TCP 연결 실패: \(error.message ?? error.localizedDescription)"
+                }
             }
         }
     }
