@@ -6,8 +6,7 @@
 //
 
 import SwiftUI
-import Darwin
-import BSDSocket
+import NetworkSocket
 import SocketClient
 
 struct ContentView: View {
@@ -78,7 +77,7 @@ struct ContentView: View {
 
                 Spacer()
             }
-            .navigationTitle("BSD Sockets")
+            .navigationTitle("Network Sockets")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -162,7 +161,7 @@ private extension ContentView {
 
 #Preview {
     ContentView(
-        tcpClient: BSDTCPClient(host: "127.0.0.1", port: 8080),
-        udpClient: BSDUDPClient(host: "127.0.0.1", port: 8080)
+        tcpClient: NetworkTCPClient(host: "127.0.0.1", port: 8080),
+        udpClient: NetworkUDPClient(host: "127.0.0.1", port: 8080)
     )
 }
